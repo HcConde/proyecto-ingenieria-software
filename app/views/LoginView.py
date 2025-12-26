@@ -3,10 +3,11 @@ from tkinter import ttk, messagebox
 
 
 class LoginView(ttk.Frame):
-    def __init__(self, parent, app_router, auth_controller):
+    def __init__(self, parent, app_router, auth_controller, state):
         super().__init__(parent)
         self.router = app_router
         self.auth = auth_controller
+        self.state = state
 
         ttk.Label(self, text="Iniciar Sesión", font=("Segoe UI", 18, "bold")).pack(pady=(20, 10))
 
@@ -27,9 +28,12 @@ class LoginView(ttk.Frame):
     def on_login(self):
         try:
             user = self.auth.do_login(self.email.get(), self.password.get())
-            messagebox.showinfo("OK", f"Bienvenido: {user.nombre} ({user.rol})")
-            # aquí luego rediriges a tu editor principal:
-            # self.router.show("workspace")
-            self.router.show("home")
+            self.state.current_user = user
+
+            if user.rol == "ALUMNO":
+                self.router.show("workspace")
+            else:
+                self.router.show("teacher_dashboard")
+
         except Exception as e:
             messagebox.showerror("Error", str(e))

@@ -4,9 +4,12 @@ from tkinter import ttk
 from app.config.database import init_db
 from app.controllers.AuthController import AuthController
 
+from app.app_state import AppState
 from app.views.MainView import MainView
 from app.views.LoginView import LoginView
 from app.views.RegisterView import RegisterView
+from app.views.BlockWorkspaceView import BlockWorkspaceView
+from app.views.TeacherDashboardView import TeacherDashboardView
 
 
 class Router:
@@ -34,12 +37,16 @@ def main():
     style = ttk.Style()
     style.theme_use("clam")
 
+    state = AppState()
     router = Router(root)
     auth = AuthController()
 
     router.add("home", MainView(root, router))
-    router.add("login", LoginView(root, router, auth))
+    router.add("login", LoginView(root, router, auth, state))
     router.add("register", RegisterView(root, router, auth))
+    router.add("workspace", BlockWorkspaceView(root, router, state))
+    router.add("teacher_dashboard", TeacherDashboardView(root, router, state))
+
 
     router.show("home")
     root.mainloop()
