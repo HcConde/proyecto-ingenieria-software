@@ -2,9 +2,14 @@ import tkinter as tk
 from tkinter import ttk
 
 from app.config.database import init_db
-from app.controllers.AuthController import AuthController
-
 from app.app_state import AppState
+
+from app.controllers.AuthController import AuthController
+from app.controllers.ProgramController import ProgramController
+from app.controllers.UserController import UserController
+
+
+from app.views.ProfileView import ProfileView
 from app.views.MainView import MainView
 from app.views.LoginView import LoginView
 from app.views.RegisterView import RegisterView
@@ -23,7 +28,11 @@ class Router:
     def show(self, name):
         for f in self.frames.values():
             f.pack_forget()
-        self.frames[name].pack(fill="both", expand=True)
+        frame = self.frames[name]
+        frame.pack(fill="both", expand=True)
+
+        if hasattr(frame, "on_show"):
+            frame.on_show()
 
 
 def main():
@@ -34,19 +43,21 @@ def main():
     root.geometry("1100x700")
     root.minsize(900, 600)
 
-    style = ttk.Style()
-    style.theme_use("clam")
+    ttk.Style().theme_use("clam")
 
     state = AppState()
     router = Router(root)
+
     auth = AuthController()
+    program_ctrl = ProgramController()
+    user_ctrl = UserController()
 
     router.add("home", MainView(root, router))
     router.add("login", LoginView(root, router, auth, state))
     router.add("register", RegisterView(root, router, auth))
-    router.add("workspace", BlockWorkspaceView(root, router, state))
-    router.add("teacher_dashboard", TeacherDashboardView(root, router, state))
-
+    router.add("workspace", BlockWorkspaceView(root, router, state, program_ctrl))
+    router.add("teacher_dashboard", TeacherDashboardView(root, router, state, program_ctrl))
+    router.add("profile", ProfileView(root, router, state, user_ctrl))
 
     router.show("home")
     root.mainloop()

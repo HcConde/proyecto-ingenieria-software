@@ -1,349 +1,482 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
-import json
+from tkinter import ttk, messagebox, filedialog, simpledialog
 import math
+import json
 
 
 class BlockWorkspaceView(ttk.Frame):
-    """
-    Vista Scratch-like (MVP):
-    - Panel izquierdo: biblioteca de bloques
-    - Centro: workspace con bloques arrastrables
-    - Derecha: simulación del carrito en Canvas
-    """
+    COL_X = 60
+    COL_Y0 = 30
+    SLOT_H = 60
+    BW = 280
+    BH = 44
 
-    def __init__(self, parent, router, state):
+    def __init__(self, parent, router, state, program_controller):
         super().__init__(parent)
         self.router = router
         self.state = state
+        self.program_ctrl = program_controller
+        self.last_saved_program_id = None
 
-        # Toolbar superior
+        # -------- Top bar mínimo
         top = ttk.Frame(self)
-        top.pack(fill="x", padx=12, pady=10)
+        top.pack(fill="x", padx=10, pady=8)
+        ttk.Label(top, text="Editor de Bloques", font=("Segoe UI", 13, "bold")).pack(side="left")
+        # perfil de usuario
+        self.user_btn = ttk.Button(top, text="👤 Usuario", command=self.open_user_menu)
+        self.user_btn.pack(side="right", padx=6)
 
-        user_txt = "Usuario: (sin sesión)"
-        if self.state.current_user:
-            u = self.state.current_user
-            user_txt = f"Usuario: {u.nombre} {u.apellido} ({u.rol})"
+        ttk.Button(top, text="Cerrar sesión", command=self.logout).pack(side="right", padx=6)
 
-        ttk.Label(top, text="Editor de Bloques", font=("Segoe UI", 14, "bold")).pack(side="left")
-        ttk.Label(top, text=user_txt).pack(side="left", padx=15)
-
-        ttk.Button(top, text="Exportar (JSON)", command=self.export_program).pack(side="right", padx=5)
-        ttk.Button(top, text="Limpiar", command=self.clear_workspace).pack(side="right", padx=5)
-        ttk.Button(top, text="Cerrar sesión", command=self.logout).pack(side="right", padx=5)
+        self.user_menu = tk.Menu(self, tearoff=0)
+        self.user_menu.add_command(label="Editar perfil", command=lambda: self.router.show("profile"))
 
 
-        # Layout 3 columnas
+        # -------- 3 columnas
         paned = ttk.PanedWindow(self, orient="horizontal")
-        paned.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        paned.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
-        left = ttk.Frame(paned, width=250)
+        left = ttk.Frame(paned, width=240)
         center = ttk.Frame(paned)
-        right = ttk.Frame(paned, width=340)
-
+        right = ttk.Frame(paned, width=360)
         paned.add(left, weight=0)
         paned.add(center, weight=1)
         paned.add(right, weight=0)
 
-
-        # Izquierda: Biblioteca
-        ttk.Label(left, text="Biblioteca de Bloques", font=("Segoe UI", 11, "bold")).pack(
-            anchor="w", pady=(10, 8), padx=10
-        )
+        # -------- Biblioteca
+        ttk.Label(left, text="Bloques", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
         self.block_defs = [
             ("AVANZAR", "Avanzar"),
+            ("RETROCEDER", "Retroceder"),
             ("GIRAR_IZQ", "Girar Izq"),
             ("GIRAR_DER", "Girar Der"),
             ("DETENER", "Detener"),
         ]
-
         for code, label in self.block_defs:
-            ttk.Button(left, text=label, command=lambda c=code, l=label: self.create_block(c, l)).pack(
-                fill="x", padx=10, pady=5
+            ttk.Button(left, text=label, command=lambda c=code, l=label: self.add_block(c, l)).pack(
+                fill="x", padx=10, pady=4
             )
 
-        ttk.Separator(left).pack(fill="x", padx=10, pady=10)
-        ttk.Label(left, text="Tip: arrastra los bloques al workspace.", wraplength=220).pack(
-            padx=10, pady=(0, 10)
+        # -------- Workspace label
+        ttk.Label(center, text="Secuencia ", font=("Segoe UI", 11, "bold")).pack(
+            anchor="w", padx=10, pady=(10, 6)
         )
 
+        # ✅ BOTONES donde pediste: debajo del label y antes del canvas
+        btn_row = ttk.Frame(center)
+        btn_row.pack(fill="x", padx=10, pady=(0, 8))
 
-        # Centro: Workspace
-        ttk.Label(center, text="Workspace", font=("Segoe UI", 11, "bold")).pack(
-            anchor="w", pady=(10, 8), padx=10
-        )
+        ttk.Button(btn_row, text="Limpiar", command=self.clear_all).pack(side="left", padx=4)
+        ttk.Button(btn_row, text="Guardar", command=self.save_program).pack(side="left", padx=4)
+        ttk.Button(btn_row, text="Enviar al docente", command=self.send_to_teacher).pack(side="left", padx=4)
+        ttk.Button(btn_row, text="Cargar", command=self.load_from_file).pack(side="left", padx=4)
+        ttk.Button(btn_row, text="Descargar", command=self.download_to_file).pack(side="left", padx=4)
 
-        self.canvas = tk.Canvas(center, bg="#f7f7f7", highlightthickness=1, highlightbackground="#cccccc")
-        self.canvas.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        # -------- Workspace canvas
+        self.ws = tk.Canvas(center, bg="#f7f7f7", highlightthickness=1, highlightbackground="#cccccc")
+        self.ws.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
-        # Datos de bloques
-        self._block_id_seq = 1
-        self.blocks = {}  # tag -> {"code":..., "label":..., "x":..., "y":...}
+        self._id = 1
+        self.sequence = []
+        self.blocks = {}
 
-        # Drag & drop
-        self._drag_data = {"x": 0, "y": 0, "tag": None}
-        self.canvas.tag_bind("draggable", "<ButtonPress-1>", self.on_drag_start)
-        self.canvas.tag_bind("draggable", "<B1-Motion>", self.on_drag_move)
-        self.canvas.tag_bind("draggable", "<ButtonRelease-1>", self.on_drag_end)
+        self._drag = {"tag": None, "x": 0, "y": 0}
+        self.ws.tag_bind("drag", "<ButtonPress-1>", self.drag_start)
+        self.ws.tag_bind("drag", "<B1-Motion>", self.drag_move)
+        self.ws.tag_bind("drag", "<ButtonRelease-1>", self.drag_end)
+        self.ws.tag_bind("del", "<Button-1>", self.on_delete_click)
 
+        # -------- Simulación
+        ttk.Label(right, text="Simulación", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
-        # Derecha: Simulador
-        ttk.Label(right, text="Simulación", font=("Segoe UI", 11, "bold")).pack(
-            anchor="w", pady=(10, 8), padx=10
-        )
+        sim_bar = ttk.Frame(right)
+        sim_bar.pack(fill="x", padx=10)
 
-        sim_controls = ttk.Frame(right)
-        sim_controls.pack(fill="x", padx=10)
-
-        ttk.Button(sim_controls, text="▶ Simular", command=self.run_simulation).pack(side="left")
-        ttk.Button(sim_controls, text="⟲ Reset", command=self.reset_simulation).pack(side="left", padx=8)
+        ttk.Button(sim_bar, text="▶ Simular", command=self.run_sim).pack(side="left")
+        ttk.Button(sim_bar, text="⟲ Reset", command=self.reset_sim).pack(side="left", padx=8)
+        # ✅ Nuevo botón placeholder
+        ttk.Button(sim_bar, text="Simular carrito real", command=self.sim_real_placeholder).pack(side="left")
 
         self.sim_status = ttk.Label(right, text="Estado: listo")
         self.sim_status.pack(anchor="w", padx=10, pady=(8, 0))
 
-        self.sim_canvas = tk.Canvas(right, bg="white", highlightthickness=1, highlightbackground="#cccccc")
-        self.sim_canvas.pack(fill="both", expand=True, padx=10, pady=10)
+        self.sim = tk.Canvas(right, bg="white", highlightthickness=1, highlightbackground="#cccccc")
+        self.sim.pack(fill="both", expand=True, padx=10, pady=10)
 
-
-        self.sim_after_id = None
+        self.sim_after = None
         self.sim_queue = []
-        self.sim_idx = 0
-        self.car = {"x": 160, "y": 200, "heading": -90}  
-        self.car_item_ids = {"body": None, "dir": None}
+        self.sim_i = 0
+        self.car = {"x": 160, "y": 200, "heading": -90}
+        self.car_ids = {"body": None, "dir": None}
+        self.reset_sim()
 
-        self.draw_sim_grid()
-        self.draw_car()
-
-    # Sesión / navegación
+    # -----------------------
+    # Sesión
+    # -----------------------
     def logout(self):
         self.state.current_user = None
         self.router.show("home")
 
+    # -----------------------
+    # Bloques
+    # -----------------------
+    def param_info(self, code):
+        if code in ("AVANZAR", "RETROCEDER"):
+            return {"min": 10, "max": 200, "default": 50}
+        if code in ("GIRAR_IZQ", "GIRAR_DER"):
+            return {"min": 0, "max": 180, "default": 90}
+        return None
 
-    # Workspace: creación y drag
-    def create_block(self, code: str, label: str):
-        tag = f"block_{self._block_id_seq}"
-        self._block_id_seq += 1
+    def add_block(self, code, label, preset_value=None):
+        tag = f"b{self._id}"
+        self._id += 1
 
-        x, y = 60, 40 + (len(self.blocks) * 55)
+        x = self.COL_X
+        y = self.COL_Y0 + len(self.sequence) * self.SLOT_H + 8
 
-        rect = self.canvas.create_rectangle(
-            x, y, x + 180, y + 40,
-            outline="#333333", width=2,
-            tags=(tag, "draggable")
-        )
-        text = self.canvas.create_text(
-            x + 90, y + 20,
-            text=label, font=("Segoe UI", 10, "bold"),
-            tags=(tag, "draggable")
-        )
+        self.ws.create_rectangle(x, y, x + self.BW, y + self.BH, outline="#333", width=2, fill="#fff", tags=(tag, "drag"))
+        self.ws.create_text(x + 12, y + self.BH // 2, text=label, anchor="w", font=("Segoe UI", 10, "bold"), tags=(tag, "drag"))
 
-        self.blocks[tag] = {"code": code, "label": label, "x": x, "y": y}
-        self.canvas.tag_raise(text, rect)
+        # X para borrar (no arrastrable)
+        self.ws.create_text(x + self.BW - 12, y + 10, text="×", font=("Segoe UI", 14, "bold"),
+                            fill="#aa0000", tags=(tag, "del"))
 
-    def on_drag_start(self, event):
-        item = self.canvas.find_withtag("current")
+        info = self.param_info(code)
+        param_var = None
+        if info:
+            val = info["default"] if preset_value is None else preset_value
+            param_var = tk.StringVar(value=str(val))
+
+            entry = ttk.Entry(self.ws, width=6, textvariable=param_var, justify="center")
+            self.ws.create_window(x + self.BW - 55, y + self.BH // 2, window=entry, tags=(tag,))
+            entry.bind("<Button-1>", lambda e: (entry.focus_set(), "break"))
+
+            self.ws.create_text(x + self.BW - 105, y + self.BH // 2, text=f'{info["min"]}-{info["max"]}',
+                                anchor="e", font=("Segoe UI", 8), fill="#666", tags=(tag, "drag"))
+
+        self.blocks[tag] = {"code": code, "label": label, "param": param_var}
+        self.sequence.append(tag)
+        self.relayout()
+
+    def on_delete_click(self, event):
+        item = self.ws.find_withtag("current")
         if not item:
             return
-        tags = self.canvas.gettags(item[0])
-        block_tag = next((t for t in tags if t.startswith("block_")), None)
-        if not block_tag:
-            return
-        self._drag_data["tag"] = block_tag
-        self._drag_data["x"] = event.x
-        self._drag_data["y"] = event.y
+        tags = self.ws.gettags(item[0])
+        tag = next((t for t in tags if t.startswith("b")), None)
+        if tag:
+            self.delete_block(tag)
 
-    def on_drag_move(self, event):
-        tag = self._drag_data["tag"]
+    def delete_block(self, tag):
+        if tag in self.sequence:
+            self.sequence.remove(tag)
+        self.blocks.pop(tag, None)
+        self.ws.delete(tag)
+        self.relayout()
+
+    def relayout(self):
+        for idx, tag in enumerate(self.sequence):
+            x = self.COL_X
+            y = self.COL_Y0 + idx * self.SLOT_H + 8
+            bbox = self.ws.bbox(tag)
+            if bbox:
+                x1, y1, *_ = bbox
+                self.ws.move(tag, x - x1, y - y1)
+
+    # -----------------------
+    # Drag
+    # -----------------------
+    def drag_start(self, event):
+        item = self.ws.find_withtag("current")
+        if not item:
+            return
+        tags = self.ws.gettags(item[0])
+        tag = next((t for t in tags if t.startswith("b")), None)
         if not tag:
             return
-        dx = event.x - self._drag_data["x"]
-        dy = event.y - self._drag_data["y"]
-        self.canvas.move(tag, dx, dy)
-        self._drag_data["x"] = event.x
-        self._drag_data["y"] = event.y
+        self._drag.update(tag=tag, x=event.x, y=event.y)
 
-    def on_drag_end(self, event):
-        tag = self._drag_data["tag"]
+    def drag_move(self, event):
+        tag = self._drag["tag"]
         if not tag:
             return
+        dx = event.x - self._drag["x"]
+        dy = event.y - self._drag["y"]
+        self.ws.move(tag, dx, dy)
+        self._drag["x"] = event.x
+        self._drag["y"] = event.y
 
-        bbox = self.canvas.bbox(tag)
-        if bbox:
-            x1, y1, x2, y2 = bbox
-            self.blocks[tag]["x"] = x1
-            self.blocks[tag]["y"] = y1
+    def drag_end(self, event):
+        tag = self._drag["tag"]
+        if not tag:
+            return
+        idx = int((event.y - self.COL_Y0) / self.SLOT_H)
+        idx = max(0, min(len(self.sequence) - 1, idx))
 
-        self._drag_data["tag"] = None
+        old = self.sequence.index(tag)
+        self.sequence.pop(old)
+        self.sequence.insert(idx, tag)
+        self._drag["tag"] = None
+        self.relayout()
 
-    def clear_workspace(self):
-        self.canvas.delete("all")
+    # -----------------------
+    # Programa
+    # -----------------------
+    def get_program(self):
+        prog = []
+        for tag in self.sequence:
+            b = self.blocks[tag]
+            code = b["code"]
+            info = self.param_info(code)
+
+            if not info:
+                prog.append({"code": code, "value": None})
+                continue
+
+            raw = (b["param"].get() if b["param"] else "").strip()
+            if raw == "":
+                raise ValueError(f"Falta parámetro en {b['label']}.")
+
+            val = int(raw)  # si falla, lanza
+            if not (info["min"] <= val <= info["max"]):
+                raise ValueError(f"Parámetro fuera de rango en {b['label']}: {info['min']}..{info['max']}")
+
+            prog.append({"code": code, "value": val})
+        return prog
+
+    # ✅ Guardar en DB (tabla programa)
+    def save_program(self):
+        if not self.state.current_user:
+            messagebox.showerror("Error", "No hay sesión.")
+            return
+        if not self.sequence:
+            messagebox.showinfo("Guardar", "No hay bloques.")
+            return
+
+        try:
+            program = self.get_program()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            return
+
+        nombre = simpledialog.askstring("Guardar", "Nombre del programa:", parent=self)
+        if not nombre:
+            return
+
+        try:
+            pid = self.program_ctrl.save_program(self.state.current_user.id, nombre, program)
+            self.last_saved_program_id = pid
+            messagebox.showinfo("OK", f"Programa guardado (ID: {pid}).")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    # ✅ Enviar al docente (requiere haber guardado primero)
+    def send_to_teacher(self):
+        if not self.last_saved_program_id:
+            messagebox.showwarning("Enviar", "Primero guarda el programa.")
+            return
+
+        correo = simpledialog.askstring("Enviar al docente", "Correo del docente:", parent=self)
+        if not correo:
+            return
+
+        try:
+            self.program_ctrl.send_to_teacher(self.last_saved_program_id, correo)
+            messagebox.showinfo("OK", "Enviado al docente ✅ (aparecerá en su dashboard).")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    # ✅ Cargar (importar proyecto externo JSON)
+    def load_from_file(self):
+        path = filedialog.askopenfilename(
+            title="Cargar proyecto",
+            filetypes=[("Proyecto JSON", "*.json"), ("Todos", "*.*")]
+        )
+        if not path:
+            return
+
+        try:
+            content = open(path, "r", encoding="utf-8").read()
+            program = json.loads(content)
+            if not isinstance(program, list):
+                raise ValueError("Formato inválido: se esperaba una lista.")
+
+            # limpiar y reconstruir
+            self.clear_all()
+            code_to_label = {c: l for c, l in self.block_defs}
+            for step in program:
+                code = step.get("code")
+                value = step.get("value")
+                if code not in code_to_label:
+                    raise ValueError(f"Bloque desconocido en archivo: {code}")
+                self.add_block(code, code_to_label[code], preset_value=value)
+
+            messagebox.showinfo("OK", "Proyecto cargado ✅")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo cargar: {e}")
+
+    # ✅ Descargar (exportar proyecto a archivo JSON)
+    def download_to_file(self):
+        if not self.sequence:
+            messagebox.showinfo("Descargar", "No hay bloques.")
+            return
+        try:
+            program = self.get_program()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+            return
+
+        path = filedialog.asksaveasfilename(
+            title="Descargar proyecto",
+            defaultextension=".json",
+            filetypes=[("Proyecto JSON", "*.json")]
+        )
+        if not path:
+            return
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(program, f, ensure_ascii=False, indent=2)
+            messagebox.showinfo("OK", "Proyecto descargado ✅")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def clear_all(self):
+        self.ws.delete("all")
+        self.sequence.clear()
         self.blocks.clear()
+        self._drag = {"tag": None, "x": 0, "y": 0}
+        self.last_saved_program_id = None
+        self.reset_sim()
 
+    # -----------------------
+    # Simulación
+    # -----------------------
+    def sim_real_placeholder(self):
+        messagebox.showinfo("Simular carrito real", "Aún no implementado (placeholder).")
 
-        self.canvas.tag_bind("draggable", "<ButtonPress-1>", self.on_drag_start)
-        self.canvas.tag_bind("draggable", "<B1-Motion>", self.on_drag_move)
-        self.canvas.tag_bind("draggable", "<ButtonRelease-1>", self.on_drag_end)
+    def reset_sim(self):
+        if self.sim_after:
+            self.after_cancel(self.sim_after)
+            self.sim_after = None
 
-
-        self.reset_simulation()
-
-
-    def get_ordered_program(self):
-        """Devuelve lista de bloques ordenados de arriba hacia abajo por posición Y."""
-        ordered = sorted(self.blocks.items(), key=lambda kv: kv[1]["y"])
-        return [{"code": data["code"], "label": data["label"]} for _, data in ordered]
-
-    def export_program(self):
-        if not self.blocks:
-            messagebox.showinfo("Exportar", "No hay bloques en el workspace.")
-            return
-
-        program = self.get_ordered_program()
-        messagebox.showinfo("Programa (JSON)", json.dumps(program, indent=2, ensure_ascii=False))
-
-
-    # Simulación (derecha)
-    def draw_sim_grid(self):
-        self.sim_canvas.delete("grid")
-        w = self.sim_canvas.winfo_width() or 320
-        h = self.sim_canvas.winfo_height() or 360
-
-        step = 40
-        for x in range(0, w, step):
-            self.sim_canvas.create_line(x, 0, x, h, fill="#eeeeee", tags="grid")
-        for y in range(0, h, step):
-            self.sim_canvas.create_line(0, y, w, y, fill="#eeeeee", tags="grid")
-
-    def draw_car(self):
-        # borra si existe
-        if self.car_item_ids["body"]:
-            self.sim_canvas.delete(self.car_item_ids["body"])
-        if self.car_item_ids["dir"]:
-            self.sim_canvas.delete(self.car_item_ids["dir"])
-
-        x = self.car["x"]
-        y = self.car["y"]
-        heading = math.radians(self.car["heading"])
-
-        # cuerpo del carrito 
-        size = 16
-        body = self.sim_canvas.create_rectangle(
-            x - size, y - size, x + size, y + size,
-            outline="#333333", width=2, fill="#dff3ff"
-        )
-
-
-        dx = math.cos(heading) * 26
-        dy = math.sin(heading) * 26
-        direction = self.sim_canvas.create_line(
-            x, y, x + dx, y + dy,
-            fill="#333333", width=3, arrow="last"
-        )
-
-        self.car_item_ids["body"] = body
-        self.car_item_ids["dir"] = direction
-
-    def reset_simulation(self):
-        if self.sim_after_id:
-            self.after_cancel(self.sim_after_id)
-            self.sim_after_id = None
-
-        self.car = {"x": 160, "y": 200, "heading": -90}
         self.sim_queue = []
-        self.sim_idx = 0
+        self.sim_i = 0
         self.sim_status.config(text="Estado: listo")
 
-        self.sim_canvas.delete("all")
-        self.draw_sim_grid()
+        self.sim.delete("all")
+        w = self.sim.winfo_width() or 320
+        h = self.sim.winfo_height() or 360
+        for x in range(0, int(w), 40):
+            self.sim.create_line(x, 0, x, h, fill="#eee")
+        for y in range(0, int(h), 40):
+            self.sim.create_line(0, y, w, y, fill="#eee")
+
+        self.car = {"x": w / 2, "y": h / 2, "heading": -90}
         self.draw_car()
 
-    def run_simulation(self):
-        if self.sim_after_id:
-            
+    def draw_car(self):
+        self.sim.delete("car")
+        x, y = self.car["x"], self.car["y"]
+        heading = math.radians(self.car["heading"])
+        size = 16
+        self.sim.create_rectangle(x - size, y - size, x + size, y + size,
+                                  outline="#333", width=2, fill="#dff3ff", tags="car")
+        dx = math.cos(heading) * 26
+        dy = math.sin(heading) * 26
+        self.sim.create_line(x, y, x + dx, y + dy, width=3, arrow="last", tags="car")
+
+    def run_sim(self):
+        if self.sim_after:
+            return
+        if not self.sequence:
+            messagebox.showinfo("Simulación", "No hay bloques.")
             return
 
-        if not self.blocks:
-            messagebox.showinfo("Simulación", "No hay bloques para simular.")
+        try:
+            program = self.get_program()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
             return
 
-        # Crea cola de ejecución
-        program = self.get_ordered_program()
-
-       
-        queue = []
-        for b in program:
-            code = b["code"]
+        q = []
+        for s in program:
+            code, val = s["code"], s["value"]
             if code == "AVANZAR":
-                queue.append(("MOVE", 40))
+                q.append(("MOVE", val))
+            elif code == "RETROCEDER":
+                q.append(("MOVE", -val))
             elif code == "GIRAR_IZQ":
-                queue.append(("TURN", -90))
+                q.append(("TURN", -val))
             elif code == "GIRAR_DER":
-                queue.append(("TURN", 90))
+                q.append(("TURN", val))
             elif code == "DETENER":
-                queue.append(("STOP", 0))
-            else:
-                queue.append(("UNKNOWN", code))
+                q.append(("STOP", 0))
 
-        self.sim_queue = queue
-        self.sim_idx = 0
+        self.sim_queue = q
+        self.sim_i = 0
         self.sim_status.config(text="Estado: simulando...")
+        self.step_sim()
 
-        
-        self.step_simulation()
-
-
-    def step_simulation(self):
-        if self.sim_idx >= len(self.sim_queue):
-            self.sim_after_id = None
+    def step_sim(self):
+        if self.sim_i >= len(self.sim_queue):
+            self.sim_after = None
             self.sim_status.config(text="Estado: terminado ✅")
             return
 
-        action, value = self.sim_queue[self.sim_idx]
-        self.sim_idx += 1
-
-        if action == "MOVE":
-            self._anim_move(distance=value, steps=10, delay_ms=30)
-            return
+        action, value = self.sim_queue[self.sim_i]
+        self.sim_i += 1
 
         if action == "TURN":
             self.car["heading"] = (self.car["heading"] + value) % 360
             self.draw_car()
-            self.sim_after_id = self.after(250, self.step_simulation)
+            self.sim_after = self.after(180, self.step_sim)
             return
 
         if action == "STOP":
-            self.sim_after_id = self.after(250, self.step_simulation)
+            self.sim_after = self.after(200, self.step_sim)
             return
 
-        
-        self.sim_status.config(text="Estado: bloque desconocido ⚠️")
-        self.sim_after_id = self.after(400, self.step_simulation)
+        if action == "MOVE":
+            self.anim_move(value)
 
-    def _anim_move(self, distance: int, steps: int, delay_ms: int):
-        
-        # movimiento suave de animacion
-        per = distance / steps
+    def anim_move(self, dist, steps=12, delay=25):
+        per = dist / steps
         heading = math.radians(self.car["heading"])
 
         def tick(i=0):
             if i >= steps:
                 self.draw_car()
-                self.sim_after_id = self.after(200, self.step_simulation)
+                self.sim_after = self.after(140, self.step_sim)
                 return
 
             self.car["x"] += math.cos(heading) * per
             self.car["y"] += math.sin(heading) * per
 
-            # límites simples (rebote suave)
-            w = self.sim_canvas.winfo_width() or 320
-            h = self.sim_canvas.winfo_height() or 360
+            w = self.sim.winfo_width() or 320
+            h = self.sim.winfo_height() or 360
             self.car["x"] = max(20, min(w - 20, self.car["x"]))
             self.car["y"] = max(20, min(h - 20, self.car["y"]))
 
             self.draw_car()
-            self.sim_after_id = self.after(delay_ms, lambda: tick(i + 1))
+            self.sim_after = self.after(delay, lambda: tick(i + 1))
 
         tick()
+
+    def on_show(self):
+        u = self.state.current_user
+        if u:
+            self.user_btn.config(text=f"👤 {u.nombre}")
+        else:
+            self.user_btn.config(text="👤 Usuario")
+
+    def open_user_menu(self):
+        # muestra menú debajo del botón (tipo combobox)
+        try:
+            x = self.user_btn.winfo_rootx()
+            y = self.user_btn.winfo_rooty() + self.user_btn.winfo_height()
+            self.user_menu.tk_popup(x, y)
+        finally:
+            self.user_menu.grab_release()
+
