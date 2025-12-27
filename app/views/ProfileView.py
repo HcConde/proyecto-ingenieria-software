@@ -56,7 +56,7 @@ class ProfileView(ttk.Frame):
                 self.fecha.get(),
             )
             self.state.current_user = updated
-            messagebox.showinfo("OK", "Perfil actualizado ✅")
+            messagebox.showinfo("OK", "Perfil actualizado ")
             self.go_back()
         except Exception as e:
             messagebox.showerror("Error", str(e))

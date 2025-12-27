@@ -18,7 +18,7 @@ class BlockWorkspaceView(ttk.Frame):
         self.program_ctrl = program_controller
         self.last_saved_program_id = None
 
-        # -------- Top bar mínimo
+        # -------- Top bar 
         top = ttk.Frame(self)
         top.pack(fill="x", padx=10, pady=8)
         ttk.Label(top, text="Editor de Bloques", font=("Segoe UI", 13, "bold")).pack(side="left")
@@ -32,7 +32,7 @@ class BlockWorkspaceView(ttk.Frame):
         self.user_menu.add_command(label="Editar perfil", command=lambda: self.router.show("profile"))
 
 
-        # -------- 3 columnas
+
         paned = ttk.PanedWindow(self, orient="horizontal")
         paned.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
@@ -43,7 +43,7 @@ class BlockWorkspaceView(ttk.Frame):
         paned.add(center, weight=1)
         paned.add(right, weight=0)
 
-        # -------- Biblioteca
+        #  Biblioteca de bloues
         ttk.Label(left, text="Bloques", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
         self.block_defs = [
@@ -58,12 +58,12 @@ class BlockWorkspaceView(ttk.Frame):
                 fill="x", padx=10, pady=4
             )
 
-        # -------- Workspace label
+
         ttk.Label(center, text="Secuencia ", font=("Segoe UI", 11, "bold")).pack(
             anchor="w", padx=10, pady=(10, 6)
         )
 
-        # ✅ BOTONES donde pediste: debajo del label y antes del canvas
+
         btn_row = ttk.Frame(center)
         btn_row.pack(fill="x", padx=10, pady=(0, 8))
 
@@ -73,7 +73,6 @@ class BlockWorkspaceView(ttk.Frame):
         ttk.Button(btn_row, text="Cargar", command=self.load_from_file).pack(side="left", padx=4)
         ttk.Button(btn_row, text="Descargar", command=self.download_to_file).pack(side="left", padx=4)
 
-        # -------- Workspace canvas
         self.ws = tk.Canvas(center, bg="#f7f7f7", highlightthickness=1, highlightbackground="#cccccc")
         self.ws.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
@@ -87,7 +86,7 @@ class BlockWorkspaceView(ttk.Frame):
         self.ws.tag_bind("drag", "<ButtonRelease-1>", self.drag_end)
         self.ws.tag_bind("del", "<Button-1>", self.on_delete_click)
 
-        # -------- Simulación
+        # Simulación
         ttk.Label(right, text="Simulación", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
         sim_bar = ttk.Frame(right)
@@ -95,7 +94,6 @@ class BlockWorkspaceView(ttk.Frame):
 
         ttk.Button(sim_bar, text="▶ Simular", command=self.run_sim).pack(side="left")
         ttk.Button(sim_bar, text="⟲ Reset", command=self.reset_sim).pack(side="left", padx=8)
-        # ✅ Nuevo botón placeholder
         ttk.Button(sim_bar, text="Simular carrito real", command=self.sim_real_placeholder).pack(side="left")
 
         self.sim_status = ttk.Label(right, text="Estado: listo")
@@ -111,16 +109,14 @@ class BlockWorkspaceView(ttk.Frame):
         self.car_ids = {"body": None, "dir": None}
         self.reset_sim()
 
-    # -----------------------
+
     # Sesión
-    # -----------------------
     def logout(self):
         self.state.current_user = None
         self.router.show("home")
 
-    # -----------------------
+
     # Bloques
-    # -----------------------
     def param_info(self, code):
         if code in ("AVANZAR", "RETROCEDER"):
             return {"min": 10, "max": 200, "default": 50}
@@ -138,7 +134,7 @@ class BlockWorkspaceView(ttk.Frame):
         self.ws.create_rectangle(x, y, x + self.BW, y + self.BH, outline="#333", width=2, fill="#fff", tags=(tag, "drag"))
         self.ws.create_text(x + 12, y + self.BH // 2, text=label, anchor="w", font=("Segoe UI", 10, "bold"), tags=(tag, "drag"))
 
-        # X para borrar (no arrastrable)
+        # "X" para borrar 
         self.ws.create_text(x + self.BW - 12, y + 10, text="×", font=("Segoe UI", 14, "bold"),
                             fill="#aa0000", tags=(tag, "del"))
 
@@ -184,9 +180,8 @@ class BlockWorkspaceView(ttk.Frame):
                 x1, y1, *_ = bbox
                 self.ws.move(tag, x - x1, y - y1)
 
-    # -----------------------
+
     # Drag
-    # -----------------------
     def drag_start(self, event):
         item = self.ws.find_withtag("current")
         if not item:
@@ -220,9 +215,8 @@ class BlockWorkspaceView(ttk.Frame):
         self._drag["tag"] = None
         self.relayout()
 
-    # -----------------------
+   
     # Programa
-    # -----------------------
     def get_program(self):
         prog = []
         for tag in self.sequence:
@@ -245,7 +239,7 @@ class BlockWorkspaceView(ttk.Frame):
             prog.append({"code": code, "value": val})
         return prog
 
-    # ✅ Guardar en DB (tabla programa)
+    #  Guardar en DB (tabla programa)
     def save_program(self):
         if not self.state.current_user:
             messagebox.showerror("Error", "No hay sesión.")
@@ -271,7 +265,7 @@ class BlockWorkspaceView(ttk.Frame):
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-    # ✅ Enviar al docente (requiere haber guardado primero)
+    #  Enviar al docente 
     def send_to_teacher(self):
         if not self.last_saved_program_id:
             messagebox.showwarning("Enviar", "Primero guarda el programa.")
@@ -287,7 +281,7 @@ class BlockWorkspaceView(ttk.Frame):
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
-    # ✅ Cargar (importar proyecto externo JSON)
+    # Cargar (importar )
     def load_from_file(self):
         path = filedialog.askopenfilename(
             title="Cargar proyecto",
@@ -312,11 +306,11 @@ class BlockWorkspaceView(ttk.Frame):
                     raise ValueError(f"Bloque desconocido en archivo: {code}")
                 self.add_block(code, code_to_label[code], preset_value=value)
 
-            messagebox.showinfo("OK", "Proyecto cargado ✅")
+            messagebox.showinfo("OK", "Proyecto cargado ")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo cargar: {e}")
 
-    # ✅ Descargar (exportar proyecto a archivo JSON)
+    #  Descargar (exportar)
     def download_to_file(self):
         if not self.sequence:
             messagebox.showinfo("Descargar", "No hay bloques.")
@@ -338,7 +332,7 @@ class BlockWorkspaceView(ttk.Frame):
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(program, f, ensure_ascii=False, indent=2)
-            messagebox.showinfo("OK", "Proyecto descargado ✅")
+            messagebox.showinfo("OK", "Proyecto descargado ")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -350,9 +344,8 @@ class BlockWorkspaceView(ttk.Frame):
         self.last_saved_program_id = None
         self.reset_sim()
 
-    # -----------------------
-    # Simulación
-    # -----------------------
+
+    # Simulación real 
     def sim_real_placeholder(self):
         messagebox.showinfo("Simular carrito real", "Aún no implementado (placeholder).")
 
@@ -422,7 +415,7 @@ class BlockWorkspaceView(ttk.Frame):
     def step_sim(self):
         if self.sim_i >= len(self.sim_queue):
             self.sim_after = None
-            self.sim_status.config(text="Estado: terminado ✅")
+            self.sim_status.config(text="Estado: terminado ")
             return
 
         action, value = self.sim_queue[self.sim_i]
@@ -472,11 +465,10 @@ class BlockWorkspaceView(ttk.Frame):
             self.user_btn.config(text="👤 Usuario")
 
     def open_user_menu(self):
-        # muestra menú debajo del botón (tipo combobox)
+
         try:
             x = self.user_btn.winfo_rootx()
             y = self.user_btn.winfo_rooty() + self.user_btn.winfo_height()
             self.user_menu.tk_popup(x, y)
         finally:
             self.user_menu.grab_release()
-
