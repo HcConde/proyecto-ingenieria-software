@@ -16,7 +16,7 @@ class TeacherDashboardView(ttk.Frame):
 
         self.selected_user_id = None
         self._users_cache = []
-        self._user_chip_img = None  # IMPORTANTE: evita que desaparezca la imagen
+        self._user_chip_img = None  # evita que desaparezca la imagen
 
         # ==========================
         # TOP BAR
@@ -29,7 +29,7 @@ class TeacherDashboardView(ttk.Frame):
         ttk.Button(top, text="Cerrar sesión", command=self.logout).pack(side="right")
         ttk.Button(top, text="Refrescar", command=self.refresh_all).pack(side="right", padx=6)
 
-        # Menú usuario estilo "combobox"
+
         self.user_menu_btn = ttk.Menubutton(top, text="👤 Usuario")
         self.user_menu_btn.pack(side="right", padx=6)
 
@@ -285,7 +285,7 @@ class TeacherDashboardView(ttk.Frame):
     # Placeholder (sin función)
     # ---------------------------
     def real_car_placeholder(self):
-        messagebox.showinfo("Ejecutar carrito real", "Aún no implementado (placeholder).")
+        messagebox.showinfo("Ejecutar carrito real", "Aún no implementado .")
 
     # ---------------------------
     # Simulación
@@ -365,7 +365,7 @@ class TeacherDashboardView(ttk.Frame):
     def step_sim(self):
         if self.sim_i >= len(self.sim_queue):
             self.sim_after = None
-            self.sim_status.config(text="Estado: terminado ✅")
+            self.sim_status.config(text="Estado: terminado ")
             return
 
         action, value = self.sim_queue[self.sim_i]

@@ -61,7 +61,7 @@ class ProfileView(ttk.Frame):
 
         self.photo_path = None
 
-        # ✅ carga foto desde BD (puede ser relativa)
+        # carga foto desde BD 
         self.load_photo(getattr(u, "foto_path", None))
 
     def resolve_path(self, path):
@@ -104,8 +104,8 @@ class ProfileView(ttk.Frame):
                 self.fecha.get(),
                 self.photo_path
             )
-            self.state.current_user = updated  # ✅ importante
-            messagebox.showinfo("OK", "Perfil actualizado ✅")
+            self.state.current_user = updated  
+            messagebox.showinfo("OK", "Perfil actualizado ")
             self.go_back()
         except Exception as e:
             messagebox.showerror("Error", str(e))

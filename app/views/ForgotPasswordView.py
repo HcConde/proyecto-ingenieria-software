@@ -42,7 +42,7 @@ class ForgotPasswordView(ttk.Frame):
     def confirm(self):
         try:
             self.reset_ctrl.confirm_reset(self.correo.get(), self.codigo.get(), self.new_pw.get())
-            messagebox.showinfo("OK", "Contraseña actualizada ✅")
+            messagebox.showinfo("OK", "Contraseña actualizada ")
             self.router.show("login")
         except Exception as e:
             messagebox.showerror("Error", str(e))

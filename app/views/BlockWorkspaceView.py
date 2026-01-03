@@ -289,7 +289,7 @@ class BlockWorkspaceView(ttk.Frame):
             prog.append({"code": code, "value": val})
         return prog
 
-    #  Guardar en DB (tabla programa)
+    #  Guardar en DB 
     def save_program(self):
         if not self.state.current_user:
             messagebox.showerror("Error", "No hay sesión.")

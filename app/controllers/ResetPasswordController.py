@@ -6,7 +6,7 @@ from app.config.database import get_connection
 
 
 def hash_password(pw: str) -> str:
-    # Simple (mejor: bcrypt). Mantengo simple para tu proyecto actual.
+
     return hashlib.sha256(pw.encode("utf-8")).hexdigest()
 
 
@@ -19,7 +19,7 @@ class ResetPasswordController:
         with get_connection() as conn:
             user = conn.execute("SELECT id, correo FROM usuario WHERE lower(correo)=?", (correo,)).fetchone()
             if not user:
-                # Tip: por seguridad, podrías responder OK igual para no revelar si existe
+                # Tip: por seguridad
                 raise ValueError("No existe una cuenta con ese correo.")
 
             usuario_id = int(user["id"])
