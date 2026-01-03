@@ -7,47 +7,16 @@ from app.model.entities.Usuario import Usuario
 
 
 class UserController:
+    
+    def __init__(self, editar_perfil_uc):
+        self.editar_perfil_uc = editar_perfil_uc
+
     def update_profile(self, user_id, nombre, apellido, fecha_nacimiento, photo_src=None):
-        os.makedirs(PROFILES_DIR, exist_ok=True)
+        return self.editar_perfil_uc.execute(
+            user_id,
+            nombre,
+            apellido,
+            fecha_nacimiento,
+            photo_src
+        )
 
-        foto_path_db = None
-
-        if photo_src:
-            ext = os.path.splitext(photo_src)[1].lower()
-            if ext not in (".png", ".jpg", ".jpeg", ".webp"):
-                ext = ".png"
-
-            dest_abs = os.path.join(PROFILES_DIR, f"user_{user_id}{ext}")
-            shutil.copy2(photo_src, dest_abs)
-
-            foto_path_db = os.path.relpath(dest_abs, BASE_DIR).replace("\\", "/")
-
-        with get_connection() as conn:
-            if foto_path_db:
-                conn.execute(
-                    """
-                    UPDATE usuario
-                    SET nombre=?, apellido=?, fecha_nacimiento=?, foto_path=?
-                    WHERE id=?
-                    """,
-                    (nombre, apellido, fecha_nacimiento, foto_path_db, user_id),
-                )
-            else:
-                conn.execute(
-                    """
-                    UPDATE usuario
-                    SET nombre=?, apellido=?, fecha_nacimiento=?
-                    WHERE id=?
-                    """,
-                    (nombre, apellido, fecha_nacimiento, user_id),
-                )
-
-            row = conn.execute(
-                """
-                SELECT id, nombre, apellido, fecha_nacimiento, correo, rol, foto_path
-                FROM usuario WHERE id=?
-                """,
-                (user_id,),
-            ).fetchone()
-
-        return Usuario(**dict(row))

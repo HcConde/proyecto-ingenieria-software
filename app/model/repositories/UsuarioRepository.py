@@ -34,3 +34,39 @@ class UsuarioRepository:
                 (nombre.strip(), apellido.strip(), fecha_nacimiento.strip(), correo, password_hash, rol),
             )
             return int(cur.lastrowid)
+    
+
+    def update_profile(self, usuario_id, nombre, apellido, fecha_nacimiento, foto_path=None):
+        with get_connection() as conn:
+            if foto_path:
+                conn.execute(
+                    """
+                    UPDATE usuario
+                    SET nombre=?, apellido=?, fecha_nacimiento=?, foto_path=?
+                    WHERE id=?
+                    """,
+                    (nombre, apellido, fecha_nacimiento, foto_path, usuario_id),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE usuario
+                    SET nombre=?, apellido=?, fecha_nacimiento=?
+                    WHERE id=?
+                    """,
+                    (nombre, apellido, fecha_nacimiento, usuario_id),
+                )
+
+            row = conn.execute(
+                """
+                SELECT id, nombre, apellido, fecha_nacimiento, correo, rol, foto_path
+                FROM usuario
+                WHERE id=?
+                """,
+                (usuario_id,),
+            ).fetchone()
+
+        if not row:
+            raise ValueError("Usuario no encontrado")
+
+        return Usuario(**dict(row))
