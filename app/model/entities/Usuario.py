@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class Usuario:
@@ -7,4 +8,5 @@ class Usuario:
     apellido: str
     fecha_nacimiento: str
     correo: str
-    rol: str  
+    rol: str
+    foto_path: str | None = None

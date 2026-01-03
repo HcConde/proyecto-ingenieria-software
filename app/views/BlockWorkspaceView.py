@@ -1,7 +1,10 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+import os
 import math
 import json
+
+from tkinter import ttk, messagebox, filedialog, simpledialog
+from PIL import Image, ImageTk
 
 
 class BlockWorkspaceView(ttk.Frame):
@@ -18,32 +21,43 @@ class BlockWorkspaceView(ttk.Frame):
         self.program_ctrl = program_controller
         self.last_saved_program_id = None
 
-        # -------- Top bar 
+        self._user_chip_img = None
+
+        # ==========================
+        # TOP BAR
+        # ==========================
         top = ttk.Frame(self)
         top.pack(fill="x", padx=10, pady=8)
+
         ttk.Label(top, text="Editor de Bloques", font=("Segoe UI", 13, "bold")).pack(side="left")
-        # perfil de usuario
-        self.user_btn = ttk.Button(top, text="👤 Usuario", command=self.open_user_menu)
+
+        # Menú usuario
+        self.user_btn = ttk.Menubutton(top, text="👤 Usuario")
         self.user_btn.pack(side="right", padx=6)
+
+        self.user_menu = tk.Menu(self.user_btn, tearoff=0)
+        self.user_menu.add_command(label="Editar perfil", command=lambda: self.router.show("profile"))
+        self.user_btn["menu"] = self.user_menu
 
         ttk.Button(top, text="Cerrar sesión", command=self.logout).pack(side="right", padx=6)
 
-        self.user_menu = tk.Menu(self, tearoff=0)
-        self.user_menu.add_command(label="Editar perfil", command=lambda: self.router.show("profile"))
-
-
-
+        # ==========================
+        # PANED LAYOUT
+        # ==========================
         paned = ttk.PanedWindow(self, orient="horizontal")
         paned.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
         left = ttk.Frame(paned, width=240)
         center = ttk.Frame(paned)
         right = ttk.Frame(paned, width=360)
+
         paned.add(left, weight=0)
         paned.add(center, weight=1)
         paned.add(right, weight=0)
 
-        #  Biblioteca de bloues
+        # ==========================
+        # BIBLIOTECA DE BLOQUES
+        # ==========================
         ttk.Label(left, text="Bloques", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
         self.block_defs = [
@@ -53,16 +67,20 @@ class BlockWorkspaceView(ttk.Frame):
             ("GIRAR_DER", "Girar Der"),
             ("DETENER", "Detener"),
         ]
+
         for code, label in self.block_defs:
-            ttk.Button(left, text=label, command=lambda c=code, l=label: self.add_block(c, l)).pack(
-                fill="x", padx=10, pady=4
-            )
+            ttk.Button(
+                left,
+                text=label,
+                command=lambda c=code, l=label: self.add_block(c, l)
+            ).pack(fill="x", padx=10, pady=4)
 
-
-        ttk.Label(center, text="Secuencia ", font=("Segoe UI", 11, "bold")).pack(
+        # ==========================
+        # SECUENCIA (SNAP)
+        # ==========================
+        ttk.Label(center, text="Secuencia (snap vertical)", font=("Segoe UI", 11, "bold")).pack(
             anchor="w", padx=10, pady=(10, 6)
         )
-
 
         btn_row = ttk.Frame(center)
         btn_row.pack(fill="x", padx=10, pady=(0, 8))
@@ -86,7 +104,9 @@ class BlockWorkspaceView(ttk.Frame):
         self.ws.tag_bind("drag", "<ButtonRelease-1>", self.drag_end)
         self.ws.tag_bind("del", "<Button-1>", self.on_delete_click)
 
-        # Simulación
+        # ==========================
+        # SIMULACIÓN
+        # ==========================
         ttk.Label(right, text="Simulación", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
         sim_bar = ttk.Frame(right)
@@ -106,17 +126,43 @@ class BlockWorkspaceView(ttk.Frame):
         self.sim_queue = []
         self.sim_i = 0
         self.car = {"x": 160, "y": 200, "heading": -90}
-        self.car_ids = {"body": None, "dir": None}
         self.reset_sim()
 
-
-    # Sesión
+    # ==========================
+    # SESIÓN
+    # ==========================
     def logout(self):
         self.state.current_user = None
         self.router.show("home")
 
+    # ==========================
+    # PERFIL USUARIO (SEGURO)
+    # ==========================
+    def on_show(self):
+        self.load_user_chip()
 
-    # Bloques
+    def load_user_chip(self):
+        u = self.state.current_user
+        if not u:
+            self.user_btn.config(text="👤 Usuario")
+            return
+
+        self.user_btn.config(text=f"👤 {u.nombre}")
+
+        path = getattr(u, "foto_path", None)
+        if path and os.path.exists(path):
+            try:
+                img = Image.open(path).resize((18, 18))
+                self._user_chip_img = ImageTk.PhotoImage(img)
+                self.user_btn.config(image=self._user_chip_img, compound="left")
+            except Exception:
+                self.user_btn.config(image="", compound="none")
+        else:
+            self.user_btn.config(image="", compound="none")
+
+    # ==========================
+    # BLOQUES
+    # ==========================
     def param_info(self, code):
         if code in ("AVANZAR", "RETROCEDER"):
             return {"min": 10, "max": 200, "default": 50}
@@ -131,30 +177,34 @@ class BlockWorkspaceView(ttk.Frame):
         x = self.COL_X
         y = self.COL_Y0 + len(self.sequence) * self.SLOT_H + 8
 
-        self.ws.create_rectangle(x, y, x + self.BW, y + self.BH, outline="#333", width=2, fill="#fff", tags=(tag, "drag"))
-        self.ws.create_text(x + 12, y + self.BH // 2, text=label, anchor="w", font=("Segoe UI", 10, "bold"), tags=(tag, "drag"))
+        self.ws.create_rectangle(x, y, x + self.BW, y + self.BH,
+                                 outline="#333", width=2, fill="#fff", tags=(tag, "drag"))
+        self.ws.create_text(x + 12, y + self.BH // 2, text=label,
+                            anchor="w", font=("Segoe UI", 10, "bold"), tags=(tag, "drag"))
 
-        # "X" para borrar 
-        self.ws.create_text(x + self.BW - 12, y + 10, text="×", font=("Segoe UI", 14, "bold"),
+        self.ws.create_text(x + self.BW - 12, y + 10, text="×",
+                            font=("Segoe UI", 14, "bold"),
                             fill="#aa0000", tags=(tag, "del"))
 
         info = self.param_info(code)
         param_var = None
+
         if info:
             val = info["default"] if preset_value is None else preset_value
             param_var = tk.StringVar(value=str(val))
-
             entry = ttk.Entry(self.ws, width=6, textvariable=param_var, justify="center")
             self.ws.create_window(x + self.BW - 55, y + self.BH // 2, window=entry, tags=(tag,))
             entry.bind("<Button-1>", lambda e: (entry.focus_set(), "break"))
 
-            self.ws.create_text(x + self.BW - 105, y + self.BH // 2, text=f'{info["min"]}-{info["max"]}',
+            self.ws.create_text(x + self.BW - 105, y + self.BH // 2,
+                                text=f'{info["min"]}-{info["max"]}',
                                 anchor="e", font=("Segoe UI", 8), fill="#666", tags=(tag, "drag"))
 
         self.blocks[tag] = {"code": code, "label": label, "param": param_var}
         self.sequence.append(tag)
         self.relayout()
 
+   
     def on_delete_click(self, event):
         item = self.ws.find_withtag("current")
         if not item:
@@ -457,12 +507,8 @@ class BlockWorkspaceView(ttk.Frame):
 
         tick()
 
-    def on_show(self):
-        u = self.state.current_user
-        if u:
-            self.user_btn.config(text=f"👤 {u.nombre}")
-        else:
-            self.user_btn.config(text="👤 Usuario")
+
+        
 
     def open_user_menu(self):
 
@@ -472,3 +518,4 @@ class BlockWorkspaceView(ttk.Frame):
             self.user_menu.tk_popup(x, y)
         finally:
             self.user_menu.grab_release()
+

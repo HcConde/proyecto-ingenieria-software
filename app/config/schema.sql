@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS usuario (
     correo TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     rol TEXT NOT NULL CHECK (rol IN ('ALUMNO', 'DOCENTE')),
+    foto_path TEXT,
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -91,3 +92,14 @@ CREATE TABLE IF NOT EXISTS dispositivo (
     last_seen TEXT,
     FOREIGN KEY (usuario_id) REFERENCES usuario(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS password_reset (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usuario_id INTEGER NOT NULL,
+  codigo TEXT NOT NULL,
+  expira_en DATETIME NOT NULL,
+  usado INTEGER DEFAULT 0,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (usuario_id) REFERENCES usuario(id)
+);
+

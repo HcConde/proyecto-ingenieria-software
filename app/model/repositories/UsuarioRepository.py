@@ -7,7 +7,7 @@ class UsuarioRepository:
         correo = correo.strip().lower()
         with get_connection() as conn:
             row = conn.execute(
-                "SELECT id, nombre, apellido, fecha_nacimiento, correo, rol FROM usuario WHERE correo = ?",
+                "SELECT id, nombre, apellido, fecha_nacimiento, correo, rol, foto_path FROM usuario WHERE correo = ?",
                 (correo,),
             ).fetchone()
             if not row:

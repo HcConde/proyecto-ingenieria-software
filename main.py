@@ -8,13 +8,17 @@ from app.controllers.AuthController import AuthController
 from app.controllers.ProgramController import ProgramController
 from app.controllers.UserController import UserController
 
-
 from app.views.ProfileView import ProfileView
 from app.views.MainView import MainView
 from app.views.LoginView import LoginView
 from app.views.RegisterView import RegisterView
 from app.views.BlockWorkspaceView import BlockWorkspaceView
 from app.views.TeacherDashboardView import TeacherDashboardView
+
+from app.model.gateways.EmailGateway import EmailGateway
+from app.controllers.ResetPasswordController import ResetPasswordController
+from app.views.ForgotPasswordView import ForgotPasswordView
+
 
 
 class Router:
@@ -52,12 +56,22 @@ def main():
     program_ctrl = ProgramController()
     user_ctrl = UserController()
 
+    email_gateway = EmailGateway(
+    smtp_user="dije.app.eapiis@gmail.com",
+    smtp_pass="ntpkwgnrslwiquhu"   
+    )
+    reset_ctrl = ResetPasswordController(email_gateway)
+
+
     router.add("home", MainView(root, router))
     router.add("login", LoginView(root, router, auth, state))
     router.add("register", RegisterView(root, router, auth))
     router.add("workspace", BlockWorkspaceView(root, router, state, program_ctrl))
     router.add("teacher_dashboard", TeacherDashboardView(root, router, state, program_ctrl))
     router.add("profile", ProfileView(root, router, state, user_ctrl))
+    router.add("forgot_password", ForgotPasswordView(root, router, reset_ctrl))
+    router.add("profile", ProfileView(root, router, state, user_ctrl))
+
 
     router.show("home")
     root.mainloop()
@@ -65,3 +79,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    

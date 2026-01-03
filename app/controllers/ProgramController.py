@@ -67,3 +67,34 @@ class ProgramController:
             if not row:
                 raise ValueError("Programa no encontrado.")
             return row["programa_json"]
+        
+    def list_all_users(self) -> list[dict]:
+        """Lista todos los usuarios (ALUMNO y DOCENTE)."""
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, nombre, apellido, correo, rol, foto_path
+                FROM usuario
+                WHERE rol IN ('ALUMNO','DOCENTE')
+                ORDER BY rol DESC, apellido ASC, nombre ASC
+                """
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def list_projects_for_teacher_by_student(self, docente_id: int, alumno_id: int) -> list[dict]:
+        """
+        Lista proyectos ENVIADOS al docente (vía docente_proyecto) filtrados por alumno.
+        """
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT p.id as programa_id, p.nombre as programa_nombre, p.createdAt
+                FROM docente_proyecto dp
+                JOIN programa p ON p.id = dp.programa_id
+                WHERE dp.docente_id = ?
+                  AND p.usuario_id = ?
+                ORDER BY p.createdAt DESC
+                """,
+                (docente_id, alumno_id),
+            ).fetchall()
+            return [dict(r) for r in rows]

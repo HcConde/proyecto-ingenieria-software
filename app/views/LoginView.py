@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-
 class LoginView(ttk.Frame):
     def __init__(self, parent, app_router, auth_controller, state):
         super().__init__(parent)
@@ -10,7 +9,7 @@ class LoginView(ttk.Frame):
         self.state = state
 
         ttk.Label(self, text="Iniciar Sesión", font=("Segoe UI", 18, "bold")).pack(pady=(20, 10))
-
+  
         form = ttk.Frame(self)
         form.pack(pady=10)
 
@@ -24,6 +23,12 @@ class LoginView(ttk.Frame):
 
         ttk.Button(self, text="Entrar", command=self.on_login).pack(pady=8)
         ttk.Button(self, text="Volver", command=lambda: self.router.show("home")).pack()
+        ttk.Button(
+            self,
+            text="¿Olvidaste tu contraseña?",
+            command=lambda: self.router.show("forgot_password")
+        ).pack(pady=6)
+
 
     def on_login(self):
         try:

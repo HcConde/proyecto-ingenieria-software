@@ -22,4 +22,5 @@ class IniciarSesion:
             fecha_nacimiento=row["fecha_nacimiento"],
             correo=row["correo"],
             rol=row["rol"],
+            foto_path=row["foto_path"],  
         )
