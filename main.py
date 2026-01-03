@@ -96,7 +96,7 @@ def main():
     # -------------------------
     user_ctrl = UserController(editar_perfil_uc)
 
-    auth_ctrl = AuthController()              
+    auth_ctrl = AuthController(state)              
     program_ctrl = ProgramController()
     reset_ctrl = ResetPasswordController(email_gateway)
 
@@ -106,8 +106,8 @@ def main():
     router.add("home", MainView(root, router))
     router.add("login", LoginView(root, router, auth_ctrl, state))
     router.add("register", RegisterView(root, router, auth_ctrl))
-    router.add("workspace", BlockWorkspaceView(root, router, state, program_ctrl))
-    router.add("teacher_dashboard", TeacherDashboardView(root, router, state, program_ctrl))
+    router.add("workspace", BlockWorkspaceView(root, router, state, program_ctrl, auth_ctrl))
+    router.add("teacher_dashboard", TeacherDashboardView(root, router, state, program_ctrl, auth_ctrl))
     router.add("profile", ProfileView(root, router, state, user_ctrl))
     router.add("forgot_password", ForgotPasswordView(root, router, reset_ctrl))
 

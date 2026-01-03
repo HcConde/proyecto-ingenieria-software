@@ -14,12 +14,13 @@ class BlockWorkspaceView(ttk.Frame):
     BW = 280
     BH = 44
 
-    def __init__(self, parent, router, state, program_controller):
+    def __init__(self, parent, router, state, program_controller, auth_controller):
         super().__init__(parent)
         self.router = router
         self.state = state
         self.program_ctrl = program_controller
         self.last_saved_program_id = None
+        self.auth_controller = auth_controller
 
         self._user_chip_img = None
 
@@ -132,8 +133,9 @@ class BlockWorkspaceView(ttk.Frame):
     # SESIÓN
     # ==========================
     def logout(self):
-        self.state.current_user = None
+        self.auth_controller.logout()
         self.router.show("home")
+
 
     # ==========================
     # PERFIL USUARIO (SEGURO)

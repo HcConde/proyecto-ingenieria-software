@@ -8,11 +8,12 @@ from PIL import Image, ImageTk
 
 
 class TeacherDashboardView(ttk.Frame):
-    def __init__(self, parent, router, state, program_controller):
+    def __init__(self, parent, router, state, program_controller, auth_controller):
         super().__init__(parent)
         self.router = router
         self.state = state
         self.program_ctrl = program_controller
+        self.auth_controller = auth_controller
 
         self.selected_user_id = None
         self._users_cache = []
@@ -160,7 +161,7 @@ class TeacherDashboardView(ttk.Frame):
     # Sesión
     # ---------------------------
     def logout(self):
-        self.state.current_user = None
+        self.auth_controller.logout()
         self.router.show("home")
 
     # ---------------------------
