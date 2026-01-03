@@ -32,13 +32,12 @@ class LoginView(ttk.Frame):
 
     def on_login(self):
         try:
-            user = self.auth.do_login(self.email.get(), self.password.get())
-            self.state.current_user = user
-
-            if user.rol == "ALUMNO":
-                self.router.show("workspace")
-            else:
-                self.router.show("teacher_dashboard")
+            target_view = self.auth.do_login(
+                self.email.get(),
+                self.password.get()
+            )
+            self.router.show(target_view)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
