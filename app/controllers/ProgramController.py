@@ -3,6 +3,10 @@ from app.config.database import get_connection
 
 
 class ProgramController:
+    
+    def __init__(self, crear_programa_uc):
+        self.crear_programa_uc = crear_programa_uc
+
     def save_program(self, alumno_id: int, nombre: str, program_list: list[dict]) -> int:
         program_json = json.dumps(program_list, ensure_ascii=False)
         with get_connection() as conn:
@@ -98,3 +102,6 @@ class ProgramController:
                 (docente_id, alumno_id),
             ).fetchall()
             return [dict(r) for r in rows]
+    
+    def crear_programa_desde_workspace(self, bloques_ui):
+        return self.crear_programa_uc.ejecutar(bloques_ui)

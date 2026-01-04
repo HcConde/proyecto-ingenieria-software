@@ -11,6 +11,9 @@ from app.controllers.AuthController import AuthController
 from app.controllers.ProgramController import ProgramController
 from app.controllers.UserController import UserController
 from app.controllers.ResetPasswordController import ResetPasswordController
+from app.model.use_cases.MostrarBibliotecaMovimiento import MostrarBibliotecaMovimiento
+from app.controllers.BlockController import BlockController
+from app.controllers.ProgramController import ProgramController
 
 # -------------------------
 # Views
@@ -27,6 +30,7 @@ from app.views.ForgotPasswordView import ForgotPasswordView
 # Use Cases
 # -------------------------
 from app.model.use_cases.EditarPerfil import EditarPerfil
+from app.model.use_cases.CrearBloquePersonalizado import CrearBloquePersonalizado
 
 # -------------------------
 # Repositories & Services
@@ -90,15 +94,19 @@ def main():
     # Use Cases
     # -------------------------
     editar_perfil_uc = EditarPerfil(usuario_repo, file_service)
+    crear_programa_uc = CrearBloquePersonalizado()
 
     # -------------------------
     # Controllers
     # -------------------------
     user_ctrl = UserController(editar_perfil_uc)
 
-    auth_ctrl = AuthController(state)              
-    program_ctrl = ProgramController()
+    auth_ctrl = AuthController(state) 
     reset_ctrl = ResetPasswordController(email_gateway)
+    mostrar_uc = MostrarBibliotecaMovimiento()
+    block_controller = BlockController(mostrar_uc)
+    program_ctrl = ProgramController(crear_programa_uc)
+
 
     # -------------------------
     # Views
@@ -106,7 +114,7 @@ def main():
     router.add("home", MainView(root, router))
     router.add("login", LoginView(root, router, auth_ctrl, state))
     router.add("register", RegisterView(root, router, auth_ctrl))
-    router.add("workspace", BlockWorkspaceView(root, router, state, program_ctrl, auth_ctrl))
+    router.add("workspace", BlockWorkspaceView(root, router, state, program_ctrl, auth_ctrl, block_controller))
     router.add("teacher_dashboard", TeacherDashboardView(root, router, state, program_ctrl, auth_ctrl))
     router.add("profile", ProfileView(root, router, state, user_ctrl))
     router.add("forgot_password", ForgotPasswordView(root, router, reset_ctrl))

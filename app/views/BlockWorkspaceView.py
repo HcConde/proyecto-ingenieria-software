@@ -14,13 +14,15 @@ class BlockWorkspaceView(ttk.Frame):
     BW = 280
     BH = 44
 
-    def __init__(self, parent, router, state, program_controller, auth_controller):
+    def __init__(self, parent, router, state, program_controller, auth_controller, block_controller):
         super().__init__(parent)
         self.router = router
         self.state = state
         self.program_ctrl = program_controller
         self.last_saved_program_id = None
         self.auth_controller = auth_controller
+        self.block_controller = block_controller
+
 
         self._user_chip_img = None
 
@@ -59,22 +61,24 @@ class BlockWorkspaceView(ttk.Frame):
         # ==========================
         # BIBLIOTECA DE BLOQUES
         # ==========================
+
         ttk.Label(left, text="Bloques", font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=10, pady=(10, 6))
 
-        self.block_defs = [
-            ("AVANZAR", "Avanzar"),
-            ("RETROCEDER", "Retroceder"),
-            ("GIRAR_IZQ", "Girar Izq"),
-            ("GIRAR_DER", "Girar Der"),
-            ("DETENER", "Detener"),
-        ]
+        rol = self.state.current_user.rol if self.state.current_user else None
 
-        for code, label in self.block_defs:
+        block_defs = self.block_controller.listar_bloques_movimiento(rol)
+
+        for b in block_defs:
             ttk.Button(
                 left,
-                text=label,
-                command=lambda c=code, l=label: self.add_block(c, l)
+                text=b.label,
+                command=lambda bb=b: self.add_block(
+                    bb.code,
+                    bb.label,
+                    preset_value=bb.param_default
+                )
             ).pack(fill="x", padx=10, pady=4)
+
 
         # ==========================
         # SECUENCIA (SNAP)
@@ -113,7 +117,7 @@ class BlockWorkspaceView(ttk.Frame):
         sim_bar = ttk.Frame(right)
         sim_bar.pack(fill="x", padx=10)
 
-        ttk.Button(sim_bar, text="▶ Simular", command=self.run_sim).pack(side="left")
+        ttk.Button(sim_bar, text="▶ Simular", command=self.on_simular_click).pack(side="left")
         ttk.Button(sim_bar, text="⟲ Reset", command=self.reset_sim).pack(side="left", padx=8)
         ttk.Button(sim_bar, text="Simular carrito real", command=self.sim_real_placeholder).pack(side="left")
 
@@ -432,37 +436,47 @@ class BlockWorkspaceView(ttk.Frame):
         dy = math.sin(heading) * 26
         self.sim.create_line(x, y, x + dx, y + dy, width=3, arrow="last", tags="car")
 
-    def run_sim(self):
-        if self.sim_after:
-            return
-        if not self.sequence:
-            messagebox.showinfo("Simulación", "No hay bloques.")
-            return
-
+    def on_simular_click(self):
         try:
             program = self.get_program()
+            secuencia = self.program_ctrl.crear_programa_desde_workspace(program)
+
+            self.sim_queue = self.convertir_a_sim_queue(program)
+            self.sim_i = 0
+            self.sim_status.config(text="Estado: simulando...")
+            self.step_sim()
+
         except Exception as e:
             messagebox.showerror("Error", str(e))
-            return
+
+    def convertir_a_sim_queue(self, program):
 
         q = []
+
         for s in program:
-            code, val = s["code"], s["value"]
+            code = s.get("code")
+            value = s.get("value")
+
             if code == "AVANZAR":
-                q.append(("MOVE", val))
+                q.append(("MOVE", value))
+
             elif code == "RETROCEDER":
-                q.append(("MOVE", -val))
+                q.append(("MOVE", -value))
+
             elif code == "GIRAR_IZQ":
-                q.append(("TURN", -val))
+                q.append(("TURN", -value))
+
             elif code == "GIRAR_DER":
-                q.append(("TURN", val))
+                q.append(("TURN", value))
+
             elif code == "DETENER":
                 q.append(("STOP", 0))
 
-        self.sim_queue = q
-        self.sim_i = 0
-        self.sim_status.config(text="Estado: simulando...")
-        self.step_sim()
+            else:
+                raise ValueError(f"Bloque no soportado en simulación: {code}")
+
+        return q
+
 
     def step_sim(self):
         if self.sim_i >= len(self.sim_queue):
